@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>MOV → MP4 Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121a; --border: #2a2a3a;
+      --accent: #00e5ff; --accent2: #ff4081;
+      --text: #e8e8f0; --muted: #6b6b88;
+      --success: #00e676; --radius: 12px;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 32px 16px 80px;
+      overflow-x: hidden; -webkit-text-size-adjust: 100%;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px; pointer-events: none; z-index: 0;
+    }
+    .container { position: relative; z-index: 1; width: 100%; max-width: 680px; }
+    header { text-align: center; margin-bottom: 32px; }
+    h1 { font-size: clamp(2rem, 10vw, 3.8rem); font-weight: 800; line-height: 1.05; }
+    h1 span.mov { color: var(--accent2); }
+    h1 span.mp4 { color: var(--accent); }
+    .arrow { color: var(--muted); }
+    .subtitle { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+    .badge-row { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .badge {
+      font-family: 'Space Mono', monospace; font-size: 9px;
+      padding: 4px 9px; border-radius: 100px;
+      border: 1px solid var(--border); color: var(--muted); letter-spacing: 1px; white-space: nowrap;
+    }
+    .badge.green { border-color: rgba(0,230,118,0.3); color: var(--success); }
+    .badge.cyan  { border-color: rgba(0,229,255,0.3); color: var(--accent); }
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: clamp(32px,8vw,60px) 20px; text-align: center; cursor: pointer;
+      transition: all 0.3s; background: var(--surface);
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
+    .drop-zone:active { opacity: 0.85; }
+    .drop-icon { font-size: clamp(36px,8vw,48px); margin-bottom: 12px; display: block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    .drop-title { font-size: clamp(0.95rem,3vw,1.15rem); font-weight: 700; margin-bottom: 6px; }
+    .drop-sub { color: var(--muted); font-size: 0.85rem; font-family: 'Space Mono', monospace; }
+    .drop-mobile-hint { display: none; margin-top: 10px; color: var(--accent); font-size: 0.75rem; font-family: 'Space Mono', monospace; }
+    #fileInput { display: none; }
+    .file-card {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px; margin-top: 12px; align-items: center; gap: 12px;
+    }
+    .file-card.visible { display: flex; }
+    .file-icon-box {
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: rgba(255,64,129,0.1); border: 1px solid rgba(255,64,129,0.3);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .file-meta { flex: 1; min-width: 0; }
+    .file-name { font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .remove-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; flex-shrink: 0;
+      min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .remove-btn:hover, .remove-btn:active { border-color: var(--accent2); color: var(--accent2); }
+    .settings-card {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; margin-top: 12px;
+    }
+    .settings-card.visible { display: block; }
+    .settings-title { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; }
+    .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .setting-row:last-child { margin-bottom: 0; }
+    .setting-label { font-size: 0.82rem; font-weight: 700; min-width: 80px; flex-shrink: 0; }
+    .setting-label span { display: block; font-size: 9px; font-weight: 400; color: var(--muted); font-family: 'Space Mono', monospace; }
+    select {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; padding: 10px 12px; font-family: 'Space Mono', monospace;
+      font-size: 16px; cursor: pointer; appearance: none; flex: 1; min-height: 44px;
+    }
+    input[type="range"] { flex: 1; min-width: 80px; accent-color: var(--accent); height: 4px; cursor: pointer; padding: 10px 0; }
+    .crf-display {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; padding: 10px; font-family: 'Space Mono', monospace;
+      font-size: 12px; min-width: 44px; text-align: center; flex-shrink: 0;
+    }
+    .convert-btn {
+      width: 100%; margin-top: 12px; padding: clamp(16px,4vw,20px);
+      background: linear-gradient(135deg, var(--accent) 0%, #0080ff 100%);
+      color: #000; border: none; border-radius: var(--radius);
+      font-family: 'Syne', sans-serif; font-size: clamp(0.9rem,3vw,1rem);
+      font-weight: 800; letter-spacing: 1px; cursor: pointer;
+      display: none; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .convert-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,255,0.35); }
+    .convert-btn:active { opacity: 0.85; transform: scale(0.99); }
+    .convert-btn.visible { display: flex; }
+    .convert-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .progress-area {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-top: 12px;
+    }
+    .progress-area.visible { display: block; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .progress-status { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent); }
+    .progress-pct   { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+    .progress-track { background: var(--bg); border-radius: 100px; height: 6px; overflow: hidden; }
+    .progress-fill  {
+      height: 100%; background: linear-gradient(90deg, var(--accent), #0080ff);
+      border-radius: 100px; width: 0%; transition: width 0.4s ease;
+      box-shadow: 0 0 10px rgba(0,229,255,0.5);
+    }
+    .progress-note { margin-top: 10px; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); line-height: 1.5; text-align: center; }
+    .download-area {
+      display: none; background: var(--surface); border: 1px solid rgba(0,230,118,0.3);
+      border-radius: var(--radius); padding: 24px 20px; margin-top: 12px; text-align: center;
+    }
+    .download-area.visible { display: block; }
+    .download-icon { font-size: 36px; display: block; margin-bottom: 10px; animation: bounce 0.6s ease; }
+    @keyframes bounce { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
+    .download-title { font-size: 1.05rem; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+    .download-info  { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-bottom: 18px; }
+    .download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.4);
+      color: var(--success); border-radius: 8px; width: 100%; padding: 14px 20px;
+      font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; text-decoration: none; transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .download-btn:active { background: rgba(0,230,118,0.22); }
+    .convert-another {
+      display: block; font-size: 12px; font-family: 'Space Mono', monospace;
+      color: var(--muted); cursor: pointer; margin-top: 12px; text-decoration: underline;
+      background: none; border: none; width: 100%; text-align: center; padding: 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .convert-another:active { color: var(--accent); }
+    .error-msg {
+      display: none; background: rgba(255,64,129,0.08); border: 1px solid rgba(255,64,129,0.3);
+      border-radius: var(--radius); padding: 14px 16px; margin-top: 12px;
+      font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent2); line-height: 1.6;
+    }
+    .error-msg.visible { display: block; }
+    .info-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 28px; }
+    .info-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+    .info-card .icon  { font-size: 20px; margin-bottom: 6px; }
+    .info-card .label { font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; }
+    .info-card .desc  { font-size: 0.68rem; color: var(--muted); line-height: 1.5; font-family: 'Space Mono', monospace; }
+    footer { margin-top: 40px; text-align: center; font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 1px; padding: 0 10px; }
+    @media (max-width: 480px) {
+      body { padding: 24px 14px 60px; }
+      .drop-mobile-hint { display: block; }
+      .drop-sub { display: none; }
+      .info-row { grid-template-columns: 1fr; }
+      .convert-btn { padding: 18px; font-size: 1rem; }
+      footer { font-size: 8px; }
+    }
+    @media (max-width: 360px) {
+      h1 { font-size: 1.8rem; }
+      .badge { font-size: 8px; padding: 3px 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .drop-icon, .download-icon { animation: none; }
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span class="mov">MOV</span> <span class="arrow">→</span> <span class="mp4">MP4</span></h1>
+    <p class="subtitle">Convert in your browser. No uploads, no servers, totally free.</p>
+    <div class="badge-row">
+      <span class="badge green">✓ 100% Free</span>
+      <span class="badge cyan">✓ Runs in Browser</span>
+      <span class="badge">✓ No File Size Limit</span>
+      <span class="badge">✓ Private &amp; Secure</span>
+    </div>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <span class="drop-icon">🎬</span>
+    <div class="drop-title">Drop your MOV file here</div>
+    <div class="drop-sub">or click to browse — .mov files only</div>
+    <div class="drop-mobile-hint">👆 Tap to choose a MOV file</div>
+    <input type="file" id="fileInput" accept=".mov,video/quicktime"/>
+  </div>
+
+  <div class="file-card" id="fileCard">
+    <div class="file-icon-box">🎞️</div>
+    <div class="file-meta">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <button class="remove-btn" id="removeBtn" aria-label="Remove file">✕</button>
+  </div>
+
+  <div class="settings-card" id="settingsCard">
+    <div class="settings-title">⚙ Settings</div>
+    <div class="setting-row">
+      <div class="setting-label">Quality<span>CRF (lower = better)</span></div>
+      <input type="range" id="crfRange" min="0" max="35" value="18" step="1"/>
+      <div class="crf-display" id="crfVal">18</div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">Preset<span>Speed vs size</span></div>
+      <select id="presetSelect">
+        <option value="ultrafast">Ultrafast</option>
+        <option value="fast">Fast</option>
+        <option value="medium" selected>Medium</option>
+        <option value="slow">Slow (best)</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">Audio<span>Codec</span></div>
+      <select id="audioSelect">
+        <option value="aac" selected>AAC (recommended)</option>
+        <option value="copy">Copy original</option>
+        <option value="mp3">MP3</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="convert-btn" id="convertBtn">
+    <span>⚡</span><span>CONVERT TO MP4</span>
+  </button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-label">
+      <span class="progress-status" id="progressStatus">Loading FFmpeg…</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-note" id="progressNote">Keep this tab open while converting</div>
+  </div>
+
+  <div class="download-area" id="downloadArea">
+    <span class="download-icon">✅</span>
+    <div class="download-title">Conversion Complete!</div>
+    <div class="download-info" id="downloadInfo">—</div>
+    <a class="download-btn" id="downloadLink">⬇ Download MP4</a>
+    <button class="convert-another" id="convertAnotherBtn">Convert another file</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="info-row">
+    <div class="info-card">
+      <div class="icon">🔒</div>
+      <div class="label">100% Private</div>
+      <div class="desc">Files never leave your device.</div>
+    </div>
+    <div class="info-card">
+      <div class="icon">⚡</div>
+      <div class="label">No Quality Loss</div>
+      <div class="desc">H.264 with configurable CRF.</div>
+    </div>
+    <div class="info-card">
+      <div class="icon">📱</div>
+      <div class="label">Works on Mobile</div>
+      <div class="desc">iPhone, Android, any browser.</div>
+    </div>
+  </div>
+
+  <footer>POWERED BY FFMPEG.WASM · FREE FOREVER</footer>
+</div>
+
+<!-- ✅ CORRECT version for GitHub Pages — NO worker, NO SharedArrayBuffer needed -->
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script>
+  const { createFFmpeg, fetchFile } = FFmpeg;
+
+  const ffmpeg = createFFmpeg({
+    log: false,
+    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+  });
+
+  let ffmpegLoaded = false;
+  let selectedFile = null;
+  let outputURL    = null;
+
+  const $ = id => document.getElementById(id);
+
+  const dropZone        = $('dropZone');
+  const fileInput       = $('fileInput');
+  const fileCard        = $('fileCard');
+  const fileName        = $('fileName');
+  const fileSize        = $('fileSize');
+  const removeBtn       = $('removeBtn');
+  const settingsCard    = $('settingsCard');
+  const convertBtn      = $('convertBtn');
+  const progressArea    = $('progressArea');
+  const progressStatus  = $('progressStatus');
+  const progressPct     = $('progressPct');
+  const progressFill    = $('progressFill');
+  const progressNote    = $('progressNote');
+  const downloadArea    = $('downloadArea');
+  const downloadInfo    = $('downloadInfo');
+  const downloadLink    = $('downloadLink');
+  const convertAnotherBtn = $('convertAnotherBtn');
+  const errorMsg        = $('errorMsg');
+  const crfRange        = $('crfRange');
+  const crfVal          = $('crfVal');
+  const presetSelect    = $('presetSelect');
+  const audioSelect     = $('audioSelect');
+
+  crfRange.addEventListener('input', () => crfVal.textContent = crfRange.value);
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragging');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(f) {
+    const isMov = f.name.toLowerCase().endsWith('.mov') || f.type === 'video/quicktime';
+    if (!isMov) { showError('Please select a .mov file.'); return; }
+    if (f.size > 800 * 1024 * 1024) {
+      showError('Warning: File over 800MB — may fail on low-RAM devices.');
+    } else {
+      hideError();
+    }
+    selectedFile = f;
+    fileName.textContent = f.name;
+    fileSize.textContent = formatSize(f.size);
+    fileCard.classList.add('visible');
+    settingsCard.classList.add('visible');
+    convertBtn.classList.add('visible');
+    downloadArea.classList.remove('visible');
+    progressArea.classList.remove('visible');
+  }
+
+  removeBtn.addEventListener('click', reset);
+  convertAnotherBtn.addEventListener('click', reset);
+
+  function reset() {
+    selectedFile = null;
+    fileInput.value = '';
+    ['fileCard','settingsCard','progressArea','downloadArea']
+      .forEach(id => $(id).classList.remove('visible'));
+    convertBtn.classList.remove('visible');
+    errorMsg.classList.remove('visible');
+    if (outputURL) { URL.revokeObjectURL(outputURL); outputURL = null; }
+  }
+
+  ffmpeg.setProgress(({ ratio }) => {
+    const pct = Math.min(Math.round(ratio * 100), 99);
+    progressFill.style.width = pct + '%';
+    progressPct.textContent  = pct + '%';
+    progressStatus.textContent =
+      pct < 5  ? 'Starting…'   :
+      pct < 90 ? 'Converting…' : 'Finalizing…';
+  });
+
+  convertBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    hideError();
+    convertBtn.disabled = true;
+    progressArea.classList.add('visible');
+    progressFill.style.width = '0%';
+    progressPct.textContent  = '0%';
+    downloadArea.classList.remove('visible');
+
+    if (!ffmpegLoaded) {
+      progressStatus.textContent = 'Loading FFmpeg (~25MB)…';
+      progressNote.textContent   = 'One-time download — keep this tab open';
+      try {
+        await ffmpeg.load();
+        ffmpegLoaded = true;
+      } catch (e) {
+        showError('Failed to load FFmpeg: ' + e.message);
+        progressArea.classList.remove('visible');
+        convertBtn.disabled = false;
+        return;
+      }
+    }
+
+    try {
+      progressStatus.textContent = 'Reading file…';
+      progressNote.textContent   = 'Keep this tab open while converting';
+
+      ffmpeg.FS('writeFile', 'input.mov', await fetchFile(selectedFile));
+
+      const audioArgs = audioSelect.value === 'copy'
+        ? ['-c:a', 'copy']
+        : ['-c:a', audioSelect.value, '-b:a', '192k'];
+
+      progressStatus.textContent = 'Converting…';
+
+      await ffmpeg.run(
+        '-i',       'input.mov',
+        '-c:v',     'libx264',
+        '-crf',     crfRange.value,
+        '-preset',  presetSelect.value,
+        '-movflags','+faststart',
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        'output.mp4'
+      );
+
+      progressFill.style.width = '100%';
+      progressPct.textContent  = '100%';
+      progressStatus.textContent = 'Done!';
+      progressNote.textContent   = '';
+
+      const data = ffmpeg.FS('readFile', 'output.mp4');
+      const blob = new Blob([data.buffer], { type: 'video/mp4' });
+      if (outputURL) URL.revokeObjectURL(outputURL);
+      outputURL = URL.createObjectURL(blob);
+
+      const outName = selectedFile.name.replace(/\.mov$/i, '.mp4');
+      downloadLink.href     = outputURL;
+      downloadLink.download = outName;
+      downloadInfo.textContent = `${outName} · ${formatSize(blob.size)}`;
+
+      downloadArea.classList.add('visible');
+      progressArea.classList.remove('visible');
+
+      if (window.innerWidth <= 480) {
+        downloadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      try { ffmpeg.FS('unlink', 'input.mov');  } catch(_) {}
+      try { ffmpeg.FS('unlink', 'output.mp4'); } catch(_) {}
+
+    } catch (e) {
+      showError('Conversion failed: ' + e.message);
+      progressArea.classList.remove('visible');
+    }
+
+    convertBtn.disabled = false;
+  });
+
+  function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('visible'); }
+  function hideError()    { errorMsg.classList.remove('visible'); }
+  function formatSize(b) {
+    if (b < 1024)    return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+</script>
+</body>
+</html>

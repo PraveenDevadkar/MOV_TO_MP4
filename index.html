@@ -261,18 +261,29 @@
     <div class="info-card"><div class="icon">⚡</div><div class="label">No Quality Loss</div><div class="desc">H.264 with configurable CRF.</div></div>
     <div class="info-card"><div class="icon">📱</div><div class="label">Works on Mobile</div><div class="desc">iPhone, Android, any browser.</div></div>
   </div>
-
   <footer>POWERED BY FFMPEG.WASM · FREE FOREVER</footer>
 </div>
 
-<!-- ✅ Local file — no CDN needed -->
+<script>
+  // Register Service Worker first — it adds the COOP/COEP headers
+  // that GitHub Pages doesn't provide, enabling SharedArrayBuffer
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // If SW just installed, reload once so headers take effect
+      if (reg.installing) {
+        reg.installing.addEventListener('statechange', e => {
+          if (e.target.state === 'activated') location.reload();
+        });
+      }
+    });
+  }
+</script>
+
 <script src="ffmpeg.min.js"></script>
 <script>
   const { createFFmpeg, fetchFile } = FFmpeg;
-
   const ffmpeg = createFFmpeg({
     log: false,
-    // ⚠️ Replace YOUR-REPO-NAME with your actual GitHub repo name
     corePath: 'https://praveendevadkar.github.io/MOV_TO_MP4/ffmpeg-core.js',
   });
 
@@ -380,7 +391,6 @@
     try {
       progressStatus.textContent = 'Reading file…';
       progressNote.textContent   = 'Keep this tab open while converting';
-
       ffmpeg.FS('writeFile', 'input.mov', await fetchFile(selectedFile));
 
       const audioArgs = audioSelect.value === 'copy'
@@ -388,7 +398,6 @@
         : ['-c:a', audioSelect.value, '-b:a', '192k'];
 
       progressStatus.textContent = 'Converting…';
-
       await ffmpeg.run(
         '-i',        'input.mov',
         '-c:v',      'libx264',
@@ -429,7 +438,6 @@
       showError('Conversion failed: ' + e.message);
       progressArea.classList.remove('visible');
     }
-
     convertBtn.disabled = false;
   });
 

@@ -29,16 +29,16 @@
     }
     .container { position: relative; z-index: 1; width: 100%; max-width: 680px; }
     header { text-align: center; margin-bottom: 32px; }
-    h1 { font-size: clamp(2rem, 10vw, 3.8rem); font-weight: 800; line-height: 1.05; }
+    h1 { font-size: clamp(2rem,10vw,3.8rem); font-weight: 800; line-height: 1.05; }
     h1 span.mov { color: var(--accent2); }
     h1 span.mp4 { color: var(--accent); }
     .arrow { color: var(--muted); }
     .subtitle { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
     .badge-row { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
     .badge {
-      font-family: 'Space Mono', monospace; font-size: 9px;
-      padding: 4px 9px; border-radius: 100px;
-      border: 1px solid var(--border); color: var(--muted); letter-spacing: 1px; white-space: nowrap;
+      font-family: 'Space Mono', monospace; font-size: 9px; padding: 4px 9px;
+      border-radius: 100px; border: 1px solid var(--border); color: var(--muted);
+      letter-spacing: 1px; white-space: nowrap;
     }
     .badge.green { border-color: rgba(0,230,118,0.3); color: var(--success); }
     .badge.cyan  { border-color: rgba(0,229,255,0.3); color: var(--accent); }
@@ -62,9 +62,9 @@
     }
     .file-card.visible { display: flex; }
     .file-icon-box {
-      width: 44px; height: 44px; flex-shrink: 0;
-      background: rgba(255,64,129,0.1); border: 1px solid rgba(255,64,129,0.3);
-      border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;
+      width: 44px; height: 44px; flex-shrink: 0; background: rgba(255,64,129,0.1);
+      border: 1px solid rgba(255,64,129,0.3); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
     }
     .file-meta { flex: 1; min-width: 0; }
     .file-name { font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -170,10 +170,7 @@
       .convert-btn { padding: 18px; font-size: 1rem; }
       footer { font-size: 8px; }
     }
-    @media (max-width: 360px) {
-      h1 { font-size: 1.8rem; }
-      .badge { font-size: 8px; padding: 3px 7px; }
-    }
+    @media (max-width: 360px) { h1 { font-size: 1.8rem; } .badge { font-size: 8px; padding: 3px 7px; } }
     @media (prefers-reduced-motion: reduce) {
       .drop-icon, .download-icon { animation: none; }
       * { transition: none !important; }
@@ -260,34 +257,23 @@
   <div class="error-msg" id="errorMsg"></div>
 
   <div class="info-row">
-    <div class="info-card">
-      <div class="icon">🔒</div>
-      <div class="label">100% Private</div>
-      <div class="desc">Files never leave your device.</div>
-    </div>
-    <div class="info-card">
-      <div class="icon">⚡</div>
-      <div class="label">No Quality Loss</div>
-      <div class="desc">H.264 with configurable CRF.</div>
-    </div>
-    <div class="info-card">
-      <div class="icon">📱</div>
-      <div class="label">Works on Mobile</div>
-      <div class="desc">iPhone, Android, any browser.</div>
-    </div>
+    <div class="info-card"><div class="icon">🔒</div><div class="label">100% Private</div><div class="desc">Files never leave your device.</div></div>
+    <div class="info-card"><div class="icon">⚡</div><div class="label">No Quality Loss</div><div class="desc">H.264 with configurable CRF.</div></div>
+    <div class="info-card"><div class="icon">📱</div><div class="label">Works on Mobile</div><div class="desc">iPhone, Android, any browser.</div></div>
   </div>
 
   <footer>POWERED BY FFMPEG.WASM · FREE FOREVER</footer>
 </div>
 
-<!-- ✅ CORRECT version for GitHub Pages — NO worker, NO SharedArrayBuffer needed -->
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<!-- ✅ Local file — no CDN needed -->
+<script src="ffmpeg.min.js"></script>
 <script>
   const { createFFmpeg, fetchFile } = FFmpeg;
 
   const ffmpeg = createFFmpeg({
     log: false,
-    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+    // ⚠️ Replace YOUR-REPO-NAME with your actual GitHub repo name
+    corePath: 'https://praveendevadkar.github.io/YOUR-REPO-NAME/ffmpeg-core.js',
   });
 
   let ffmpegLoaded = false;
@@ -295,29 +281,28 @@
   let outputURL    = null;
 
   const $ = id => document.getElementById(id);
-
-  const dropZone        = $('dropZone');
-  const fileInput       = $('fileInput');
-  const fileCard        = $('fileCard');
-  const fileName        = $('fileName');
-  const fileSize        = $('fileSize');
-  const removeBtn       = $('removeBtn');
-  const settingsCard    = $('settingsCard');
-  const convertBtn      = $('convertBtn');
-  const progressArea    = $('progressArea');
-  const progressStatus  = $('progressStatus');
-  const progressPct     = $('progressPct');
-  const progressFill    = $('progressFill');
-  const progressNote    = $('progressNote');
-  const downloadArea    = $('downloadArea');
-  const downloadInfo    = $('downloadInfo');
-  const downloadLink    = $('downloadLink');
+  const dropZone          = $('dropZone');
+  const fileInput         = $('fileInput');
+  const fileCard          = $('fileCard');
+  const fileName          = $('fileName');
+  const fileSize          = $('fileSize');
+  const removeBtn         = $('removeBtn');
+  const settingsCard      = $('settingsCard');
+  const convertBtn        = $('convertBtn');
+  const progressArea      = $('progressArea');
+  const progressStatus    = $('progressStatus');
+  const progressPct       = $('progressPct');
+  const progressFill      = $('progressFill');
+  const progressNote      = $('progressNote');
+  const downloadArea      = $('downloadArea');
+  const downloadInfo      = $('downloadInfo');
+  const downloadLink      = $('downloadLink');
   const convertAnotherBtn = $('convertAnotherBtn');
-  const errorMsg        = $('errorMsg');
-  const crfRange        = $('crfRange');
-  const crfVal          = $('crfVal');
-  const presetSelect    = $('presetSelect');
-  const audioSelect     = $('audioSelect');
+  const errorMsg          = $('errorMsg');
+  const crfRange          = $('crfRange');
+  const crfVal            = $('crfVal');
+  const presetSelect      = $('presetSelect');
+  const audioSelect       = $('audioSelect');
 
   crfRange.addEventListener('input', () => crfVal.textContent = crfRange.value);
 
@@ -325,8 +310,7 @@
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
   dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('dragging');
+    e.preventDefault(); dropZone.classList.remove('dragging');
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   });
   fileInput.addEventListener('change', () => {
@@ -338,9 +322,7 @@
     if (!isMov) { showError('Please select a .mov file.'); return; }
     if (f.size > 800 * 1024 * 1024) {
       showError('Warning: File over 800MB — may fail on low-RAM devices.');
-    } else {
-      hideError();
-    }
+    } else { hideError(); }
     selectedFile = f;
     fileName.textContent = f.name;
     fileSize.textContent = formatSize(f.size);
@@ -355,8 +337,7 @@
   convertAnotherBtn.addEventListener('click', reset);
 
   function reset() {
-    selectedFile = null;
-    fileInput.value = '';
+    selectedFile = null; fileInput.value = '';
     ['fileCard','settingsCard','progressArea','downloadArea']
       .forEach(id => $(id).classList.remove('visible'));
     convertBtn.classList.remove('visible');
@@ -383,8 +364,8 @@
     downloadArea.classList.remove('visible');
 
     if (!ffmpegLoaded) {
-      progressStatus.textContent = 'Loading FFmpeg (~25MB)…';
-      progressNote.textContent   = 'One-time download — keep this tab open';
+      progressStatus.textContent = 'Loading FFmpeg…';
+      progressNote.textContent   = 'First time only — keep this tab open';
       try {
         await ffmpeg.load();
         ffmpegLoaded = true;
@@ -409,18 +390,18 @@
       progressStatus.textContent = 'Converting…';
 
       await ffmpeg.run(
-        '-i',       'input.mov',
-        '-c:v',     'libx264',
-        '-crf',     crfRange.value,
-        '-preset',  presetSelect.value,
-        '-movflags','+faststart',
-        '-pix_fmt', 'yuv420p',
+        '-i',        'input.mov',
+        '-c:v',      'libx264',
+        '-crf',      crfRange.value,
+        '-preset',   presetSelect.value,
+        '-movflags', '+faststart',
+        '-pix_fmt',  'yuv420p',
         ...audioArgs,
         'output.mp4'
       );
 
-      progressFill.style.width = '100%';
-      progressPct.textContent  = '100%';
+      progressFill.style.width   = '100%';
+      progressPct.textContent    = '100%';
       progressStatus.textContent = 'Done!';
       progressNote.textContent   = '';
 

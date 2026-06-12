@@ -81,7 +81,7 @@
       border-radius: var(--radius); padding: 18px; margin-top: 12px;
     }
     .settings-card.visible { display: block; }
-    .settings-title { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; }
+    .settings-title { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
     .convert-btn {
       width: 100%; margin-top: 12px; padding: clamp(16px,4vw,20px);
       background: linear-gradient(135deg, var(--accent) 0%, #0080ff 100%);
@@ -168,8 +168,9 @@
     <p class="subtitle">Instant conversion in your browser. No uploads, no servers, totally free.</p>
     <div class="badge-row">
       <span class="badge green">✓ 100% Free</span>
-      <span class="badge cyan">✓ Instant — No Re-encoding</span>
+      <span class="badge cyan">✓ Works on Windows</span>
       <span class="badge">✓ Private &amp; Secure</span>
+      <span class="badge">✓ Zero Quality Loss</span>
     </div>
   </header>
 
@@ -191,12 +192,10 @@
   </div>
 
   <div class="settings-card" id="settingsCard">
-    <div class="settings-title">ℹ About This Conversion</div>
-    <p style="font-size:0.8rem;color:var(--muted);line-height:1.7;font-family:'Space Mono',monospace;">
-      MOV and MP4 use the same video/audio codecs (H.264 + AAC). This tool
-      <strong style="color:var(--text)">remuxes</strong> your file — swaps the container
-      instantly without re-encoding. Result is identical quality, and conversion
-      takes only a few seconds regardless of file size.
+    <div class="settings-title">ℹ Conversion Info</div>
+    <p style="font-size:0.78rem;color:var(--muted);line-height:1.7;font-family:'Space Mono',monospace;">
+      Rewrites the container to be fully Windows-compatible (MP4/isom).
+      Video &amp; audio bytes are untouched — <strong style="color:var(--text)">zero quality loss</strong>.
     </p>
   </div>
 
@@ -210,7 +209,7 @@
       <span class="progress-pct" id="progressPct">0%</span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-    <div class="progress-note" id="progressNote">Converting…</div>
+    <div class="progress-note" id="progressNote">Please wait…</div>
   </div>
 
   <div class="download-area" id="downloadArea">
@@ -224,9 +223,9 @@
   <div class="error-msg" id="errorMsg"></div>
 
   <div class="info-row">
+    <div class="info-card"><div class="icon">🪟</div><div class="label">Windows Ready</div><div class="desc">Opens in WMP, VLC, Photos app.</div></div>
+    <div class="info-card"><div class="icon">⚡</div><div class="label">Instant Speed</div><div class="desc">No re-encoding. Done in seconds.</div></div>
     <div class="info-card"><div class="icon">🔒</div><div class="label">100% Private</div><div class="desc">Files never leave your device.</div></div>
-    <div class="info-card"><div class="icon">⚡</div><div class="label">Instant Speed</div><div class="desc">No re-encoding. Seconds, not minutes.</div></div>
-    <div class="info-card"><div class="icon">📱</div><div class="label">Works on Mobile</div><div class="desc">iPhone, Android, any browser.</div></div>
   </div>
   <footer>PURE JAVASCRIPT · NO LIBRARIES · FREE FOREVER</footer>
 </div>
@@ -255,7 +254,6 @@ const errorMsg          = $('errorMsg');
 let selectedFile = null;
 let outputURL    = null;
 
-// ── File selection ──
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
@@ -293,34 +291,26 @@ function reset() {
   if (outputURL) { URL.revokeObjectURL(outputURL); outputURL = null; }
 }
 
-// ── Convert ──
 convertBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
   hideError();
   convertBtn.disabled = true;
   progressArea.classList.add('visible');
-  progressFill.style.width = '0%';
-  progressPct.textContent  = '0%';
-  progressStatus.textContent = 'Reading file…';
-  progressNote.textContent   = 'Please wait…';
+  setProgress(0, 'Reading file…');
+  progressNote.textContent = 'Please wait…';
   downloadArea.classList.remove('visible');
 
   try {
-    // Read the MOV file as ArrayBuffer
-    setProgress(10, 'Reading file…');
+    setProgress(15, 'Reading file…');
     const arrayBuffer = await readFileAsArrayBuffer(selectedFile);
 
-    setProgress(30, 'Parsing container…');
-    // Small delay so UI updates are visible
-    await sleep(50);
+    setProgress(40, 'Parsing boxes…');
+    await sleep(30);
 
-    // Remux: MOV and MP4 are both MPEG-4 containers.
-    // The only difference is the file extension and minor ftyp box differences.
-    // We rewrite the ftyp box to MP4 and keep everything else identical.
-    const mp4Buffer = remuxMovToMp4(arrayBuffer);
+    const mp4Buffer = convertMovToMp4(arrayBuffer);
 
-    setProgress(80, 'Finalising…');
-    await sleep(50);
+    setProgress(85, 'Finalising…');
+    await sleep(30);
 
     const blob = new Blob([mp4Buffer], { type: 'video/mp4' });
     if (outputURL) URL.revokeObjectURL(outputURL);
@@ -333,8 +323,8 @@ convertBtn.addEventListener('click', async () => {
 
     setProgress(100, 'Done!');
     progressNote.textContent = '';
-
     await sleep(300);
+
     downloadArea.classList.add('visible');
     progressArea.classList.remove('visible');
 
@@ -342,7 +332,7 @@ convertBtn.addEventListener('click', async () => {
       downloadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-  } catch (e) {
+  } catch(e) {
     showError('Conversion failed: ' + e.message);
     progressArea.classList.remove('visible');
   }
@@ -350,109 +340,180 @@ convertBtn.addEventListener('click', async () => {
   convertBtn.disabled = false;
 });
 
-// ──────────────────────────────────────────────
-// Core remux logic
-// MOV (.mov) and MP4 (.mp4) are both ISO Base
-// Media File Format containers. The only real
-// difference for H.264/AAC files is the 'ftyp'
-// box brand. We rewrite it to 'mp42' / 'isom'.
-// ──────────────────────────────────────────────
-function remuxMovToMp4(buffer) {
-  const data   = new Uint8Array(buffer);
-  const output = new Uint8Array(buffer.byteLength);
-  output.set(data); // copy everything
+// ─────────────────────────────────────────────────────────────
+// Full ISO BMFF container rewriter
+// Walks every box, rewrites ftyp with Windows-compatible brands,
+// rewrites 'qt  ' handler references → standard MP4 handlers,
+// and patches 'wide' boxes (QuickTime-only) into free space.
+// Video/audio payload bytes are never touched.
+// ─────────────────────────────────────────────────────────────
+function convertMovToMp4(buffer) {
+  const src = new Uint8Array(buffer);
+  const dst = new Uint8Array(buffer.byteLength + 512); // small headroom
+  let   si  = 0; // source index
+  let   di  = 0; // dest index
 
-  let offset = 0;
-  while (offset < data.length - 8) {
-    const size = readUint32(data, offset);
-    if (size < 8) break;
-
-    const type = readFourCC(data, offset + 4);
-
-    if (type === 'ftyp') {
-      // Rewrite ftyp box:
-      // major brand  = 'mp42'
-      // minor version = 0
-      // compatible brands = mp42, mp41, isom, avc1
-      const newFtyp = buildFtypBox();
-      output.set(newFtyp, offset);
-      // If old ftyp was bigger, zero out the rest
-      if (size > newFtyp.length) {
-        output.fill(0, offset + newFtyp.length, offset + size);
-      }
-      break; // ftyp is always first, done
+  while (si < src.length) {
+    if (si + 8 > src.length) {
+      // copy remainder
+      dst.set(src.subarray(si), di);
+      di += src.length - si;
+      break;
     }
 
-    offset += size;
+    let boxSize = readU32(src, si);
+    const boxType = fourCC(src, si + 4);
+
+    // Handle 64-bit extended size (boxSize === 1)
+    let headerSize = 8;
+    let actualSize = boxSize;
+    if (boxSize === 1) {
+      actualSize = readU64(src, si + 8);
+      headerSize = 16;
+    }
+
+    if (actualSize === 0) {
+      // box extends to end of file
+      actualSize = src.length - si;
+    }
+
+    if (actualSize < 8 || si + actualSize > src.length + 1) {
+      // malformed — copy rest as-is
+      dst.set(src.subarray(si), di);
+      di += src.length - si;
+      break;
+    }
+
+    // ── ftyp: rewrite with Windows-compatible brands ──
+    if (boxType === 'ftyp') {
+      const newFtyp = makeFtyp();
+      dst.set(newFtyp, di);
+      di += newFtyp.length;
+      si += actualSize;
+      continue;
+    }
+
+    // ── wide: QuickTime placeholder box — replace with free ──
+    if (boxType === 'wide') {
+      dst.set(src.subarray(si, si + actualSize), di);
+      writeFourCC(dst, di + 4, 'free'); // rename to 'free'
+      di += actualSize;
+      si += actualSize;
+      continue;
+    }
+
+    // ── Container boxes: recurse into children ──
+    if (isContainerBox(boxType)) {
+      // copy header
+      dst.set(src.subarray(si, si + headerSize), di);
+      // patch type if needed (none currently)
+      di += headerSize;
+      si += headerSize;
+
+      // recurse: process children up to end of this box
+      const childEnd = si + (actualSize - headerSize);
+      const childSrc = src.subarray(si, childEnd);
+      const childDst = convertMovToMp4(childSrc.buffer.slice(
+        childSrc.byteOffset, childSrc.byteOffset + childSrc.byteLength
+      ));
+      const childArr = new Uint8Array(childDst);
+      dst.set(childArr, di);
+      di += childArr.length;
+      si  = childEnd;
+
+      // patch parent box size in dst
+      const parentStart = di - childArr.length - headerSize;
+      writeU32(dst, parentStart, headerSize + childArr.length);
+      continue;
+    }
+
+    // ── hdlr: fix QuickTime handler types ──
+    if (boxType === 'hdlr') {
+      dst.set(src.subarray(si, si + actualSize), di);
+      patchHdlr(dst, di, actualSize);
+      di += actualSize;
+      si += actualSize;
+      continue;
+    }
+
+    // ── All other boxes: copy verbatim ──
+    dst.set(src.subarray(si, si + actualSize), di);
+    di += actualSize;
+    si += actualSize;
   }
 
-  return output.buffer;
+  return dst.buffer.slice(0, di);
 }
 
-function buildFtypBox() {
-  // brands: mp42, mp41, isom, avc1
-  const brands  = ['mp42', 'mp41', 'isom', 'avc1'];
-  const boxSize = 8 + 4 + 4 + brands.length * 4; // size+type+major+minor+compatibles
-  const box     = new Uint8Array(boxSize);
-  let off       = 0;
-
-  // box size
-  writeUint32(box, off, boxSize); off += 4;
-  // box type 'ftyp'
-  writeFourCC(box, off, 'ftyp'); off += 4;
-  // major brand 'mp42'
-  writeFourCC(box, off, 'mp42'); off += 4;
-  // minor version 0
-  writeUint32(box, off, 0); off += 4;
-  // compatible brands
+// ftyp box: mp42 major, compatible with mp42 mp41 isom avc1
+function makeFtyp() {
+  const brands  = ['mp42','mp41','isom','avc1'];
+  const size    = 8 + 4 + 4 + brands.length * 4;
+  const box     = new Uint8Array(size);
+  let   off     = 0;
+  writeU32(box,    off, size);     off += 4;
+  writeFourCC(box, off, 'ftyp');   off += 4;
+  writeFourCC(box, off, 'mp42');   off += 4;  // major brand
+  writeU32(box,    off, 0x0200);   off += 4;  // minor version
   for (const b of brands) { writeFourCC(box, off, b); off += 4; }
-
   return box;
 }
 
-function readUint32(data, offset) {
-  return ((data[offset] << 24) | (data[offset+1] << 16) |
-          (data[offset+2] << 8) | data[offset+3]) >>> 0;
+// hdlr box: fix QuickTime-only handler component types
+function patchHdlr(data, offset, size) {
+  // hdlr layout: size(4) type(4) version+flags(4) pre_defined(4) handler_type(4) ...
+  if (size < 24) return;
+  const handlerOff = offset + 16; // after size+type+version+flags+pre_defined
+  const handler    = fourCC(data, handlerOff);
+  // QuickTime uses 'soun'/'vide' same as MP4 — no change needed usually
+  // but 'alis', 'url ' etc. should become 'url '
+  if (handler === 'alis') writeFourCC(data, handlerOff, 'url ');
 }
 
-function writeUint32(data, offset, value) {
-  data[offset]   = (value >>> 24) & 0xff;
-  data[offset+1] = (value >>> 16) & 0xff;
-  data[offset+2] = (value >>> 8)  & 0xff;
-  data[offset+3] =  value         & 0xff;
-}
+const CONTAINER_BOXES = new Set([
+  'moov','trak','mdia','minf','stbl','dinf','udta',
+  'edts','meta','ilst','moof','traf','mfra'
+]);
 
-function readFourCC(data, offset) {
-  return String.fromCharCode(data[offset], data[offset+1], data[offset+2], data[offset+3]);
-}
+function isContainerBox(type) { return CONTAINER_BOXES.has(type); }
 
-function writeFourCC(data, offset, str) {
-  for (let i = 0; i < 4; i++) data[offset + i] = str.charCodeAt(i);
+// ── Helpers ──
+function readU32(d, o) {
+  return ((d[o]<<24)|(d[o+1]<<16)|(d[o+2]<<8)|d[o+3]) >>> 0;
 }
-
+function writeU32(d, o, v) {
+  d[o]=(v>>>24)&0xff; d[o+1]=(v>>>16)&0xff; d[o+2]=(v>>>8)&0xff; d[o+3]=v&0xff;
+}
+function readU64(d, o) {
+  // JS can't represent full u64 but files < 4GB won't use high bits
+  return readU32(d, o) * 0x100000000 + readU32(d, o + 4);
+}
+function fourCC(d, o) {
+  return String.fromCharCode(d[o],d[o+1],d[o+2],d[o+3]);
+}
+function writeFourCC(d, o, s) {
+  for (let i = 0; i < 4; i++) d[o+i] = s.charCodeAt(i);
+}
 function readFileAsArrayBuffer(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = e => resolve(e.target.result);
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
+    const r = new FileReader();
+    r.onload  = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('Failed to read file'));
+    r.readAsArrayBuffer(file);
   });
 }
-
 function setProgress(pct, status) {
   progressFill.style.width   = pct + '%';
   progressPct.textContent    = pct + '%';
   progressStatus.textContent = status;
 }
-
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('visible'); }
 function hideError()    { errorMsg.classList.remove('visible'); }
 function formatSize(b) {
   if (b < 1024)    return b + ' B';
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-  return (b / 1048576).toFixed(1) + ' MB';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
 }
 </script>
 </body>

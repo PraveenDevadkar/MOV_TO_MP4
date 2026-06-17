@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>MOV → MP4 Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121a; --surface2: #1a1a26;
+      --border: #2a2a3a; --accent: #00e5ff; --accent2: #ff4081;
+      --text: #e8e8f0; --muted: #6b6b88; --success: #00e676; --radius: 12px;
+    }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 32px 16px 80px;
+      overflow-x: hidden; -webkit-text-size-adjust: 100%;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px; pointer-events: none; z-index: 0;
+    }
+    .container { position: relative; z-index: 1; width: 100%; max-width: 700px; }
+    header { text-align: center; margin-bottom: 32px; }
+    h1 { font-size: clamp(2rem,10vw,3.8rem); font-weight: 800; line-height: 1.05; }
+    h1 span.mov { color: var(--accent2); }
+    h1 span.mp4 { color: var(--accent); }
+    .subtitle { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+    .badge-row { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .badge {
+      font-family: 'Space Mono', monospace; font-size: 9px; padding: 4px 9px;
+      border-radius: 100px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+    }
+    .badge.green { border-color: rgba(0,230,118,0.3); color: var(--success); }
+    .badge.cyan  { border-color: rgba(0,229,255,0.3); color: var(--accent); }
+    .badge.pink  { border-color: rgba(255,64,129,0.3); color: var(--accent2); }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: clamp(32px,8vw,56px) 20px; text-align: center; cursor: pointer;
+      transition: all 0.3s; background: var(--surface);
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
+    .drop-zone:active { opacity: 0.85; }
+    .drop-icon { font-size: clamp(36px,8vw,48px); margin-bottom: 12px; display: block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    .drop-title { font-size: clamp(0.95rem,3vw,1.1rem); font-weight: 700; margin-bottom: 6px; }
+    .drop-sub { color: var(--muted); font-size: 0.82rem; font-family: 'Space Mono', monospace; }
+    .drop-mobile-hint { display: none; margin-top: 8px; color: var(--accent); font-size: 0.75rem; font-family: 'Space Mono', monospace; }
+    #fileInput { display: none; }
+
+    /* File card */
+    .file-card {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px; margin-top: 12px; align-items: center; gap: 12px;
+    }
+    .file-card.visible { display: flex; }
+    .file-icon-box {
+      width: 44px; height: 44px; flex-shrink: 0; background: rgba(255,64,129,0.1);
+      border: 1px solid rgba(255,64,129,0.3); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .file-meta { flex: 1; min-width: 0; }
+    .file-name { font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .remove-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; flex-shrink: 0;
+      min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
+    }
+    .remove-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* Settings */
+    .settings-card {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-top: 12px;
+    }
+    .settings-card.visible { display: block; }
+    .settings-title {
+      font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px;
+      color: var(--muted); text-transform: uppercase; margin-bottom: 16px;
+    }
+
+    /* Quality cards */
+    .quality-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px;
+    }
+    .quality-card {
+      background: var(--bg); border: 2px solid var(--border); border-radius: 10px;
+      padding: 12px 6px; text-align: center; cursor: pointer; transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .quality-card:hover { border-color: var(--accent); }
+    .quality-card.active { border-color: var(--accent); background: rgba(0,229,255,0.06); }
+    .quality-card .q-icon { font-size: 18px; margin-bottom: 5px; }
+    .quality-card .q-label { font-size: 0.65rem; font-weight: 700; display: block; }
+    .quality-card .q-desc  { font-size: 0.58rem; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 2px; display: block; }
+
+    /* Option rows */
+    .option-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .option-row:last-child { margin-bottom: 0; }
+    .option-label { font-size: 0.82rem; font-weight: 700; min-width: 90px; flex-shrink: 0; }
+    .option-label span { display: block; font-size: 9px; font-weight: 400; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .opt-btn {
+      background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; padding: 7px 12px; font-family: 'Space Mono', monospace;
+      font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+      min-height: 36px;
+    }
+    .opt-btn:hover { border-color: var(--accent); color: var(--text); }
+    .opt-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.06); }
+
+    /* Convert button */
+    .convert-btn {
+      width: 100%; margin-top: 12px; padding: clamp(16px,4vw,20px);
+      background: linear-gradient(135deg, var(--accent) 0%, #0080ff 100%);
+      color: #000; border: none; border-radius: var(--radius);
+      font-family: 'Syne', sans-serif; font-size: clamp(0.9rem,3vw,1rem);
+      font-weight: 800; letter-spacing: 1px; cursor: pointer;
+      display: none; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .convert-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,255,0.35); }
+    .convert-btn:active { opacity: 0.85; transform: scale(0.99); }
+    .convert-btn.visible { display: flex; }
+    .convert-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Progress */
+    .progress-area {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-top: 12px;
+    }
+    .progress-area.visible { display: block; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .progress-status { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent); }
+    .progress-pct    { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+    .progress-track  { background: var(--bg); border-radius: 100px; height: 6px; overflow: hidden; }
+    .progress-fill   {
+      height: 100%; background: linear-gradient(90deg, var(--accent), #0080ff);
+      border-radius: 100px; width: 0%; transition: width 0.4s ease;
+      box-shadow: 0 0 10px rgba(0,229,255,0.5);
+    }
+    .progress-note { margin-top: 10px; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-align: center; }
+
+    /* Download */
+    .download-area {
+      display: none; background: var(--surface); border: 1px solid rgba(0,230,118,0.3);
+      border-radius: var(--radius); padding: 24px 20px; margin-top: 12px; text-align: center;
+    }
+    .download-area.visible { display: block; }
+    .download-icon { font-size: 36px; display: block; margin-bottom: 10px; animation: bounce 0.6s ease; }
+    @keyframes bounce { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
+    .download-title { font-size: 1.05rem; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+    .download-meta  { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-bottom: 18px; }
+    .download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.4);
+      color: var(--success); border-radius: 8px; width: 100%; padding: 14px 20px;
+      font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; text-decoration: none; transition: all 0.2s;
+    }
+    .download-btn:active { background: rgba(0,230,118,0.22); }
+    .convert-another {
+      display: block; font-size: 12px; font-family: 'Space Mono', monospace;
+      color: var(--muted); cursor: pointer; margin-top: 12px; text-decoration: underline;
+      background: none; border: none; width: 100%; text-align: center; padding: 8px;
+    }
+
+    /* Error */
+    .error-msg {
+      display: none; background: rgba(255,64,129,0.08); border: 1px solid rgba(255,64,129,0.3);
+      border-radius: var(--radius); padding: 14px 16px; margin-top: 12px;
+      font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent2); line-height: 1.6;
+    }
+    .error-msg.visible { display: block; }
+
+    /* Info row */
+    .info-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 28px; }
+    .info-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+    .info-card .icon  { font-size: 20px; margin-bottom: 6px; }
+    .info-card .label { font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; }
+    .info-card .desc  { font-size: 0.68rem; color: var(--muted); line-height: 1.5; font-family: 'Space Mono', monospace; }
+    footer { margin-top: 40px; text-align: center; font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); padding: 0 10px; }
+
+    @media (max-width: 560px) {
+      .quality-grid { grid-template-columns: repeat(3,1fr); }
+    }
+    @media (max-width: 480px) {
+      body { padding: 24px 14px 60px; }
+      .drop-mobile-hint { display: block; }
+      .drop-sub { display: none; }
+      .info-row { grid-template-columns: 1fr; }
+      .quality-grid { grid-template-columns: repeat(3,1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .drop-icon, .download-icon { animation: none; }
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span class="mov">MOV</span> → <span class="mp4">MP4</span></h1>
+    <p class="subtitle">Server-side conversion via FFmpeg. Opens in Windows Media Player, VLC, everywhere.</p>
+    <div class="badge-row">
+      <span class="badge green">✓ WMP Compatible</span>
+      <span class="badge cyan">✓ Real FFmpeg</span>
+      <span class="badge pink">✓ Quality Control</span>
+      <span class="badge">✓ H.264 Output</span>
+    </div>
+  </header>
+
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="dropZone">
+    <span class="drop-icon">🎬</span>
+    <div class="drop-title">Drop your MOV file here</div>
+    <div class="drop-sub">or click to browse — .mov files only</div>
+    <div class="drop-mobile-hint">👆 Tap to choose a MOV file</div>
+    <input type="file" id="fileInput" accept=".mov,video/quicktime"/>
+  </div>
+
+  <!-- File card -->
+  <div class="file-card" id="fileCard">
+    <div class="file-icon-box">🎞️</div>
+    <div class="file-meta">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <button class="remove-btn" id="removeBtn">✕</button>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-card" id="settingsCard">
+    <div class="settings-title">⚙ Conversion Settings</div>
+
+    <!-- Quality -->
+    <div style="margin-bottom:6px;font-size:0.82rem;font-weight:700;">
+      Quality
+      <span style="font-size:9px;font-weight:400;color:var(--muted);font-family:'Space Mono',monospace;margin-left:6px;">higher quality = larger file</span>
+    </div>
+    <div class="quality-grid">
+      <div class="quality-card" data-quality="lossless">
+        <div class="q-icon">💎</div>
+        <span class="q-label">Lossless</span>
+        <span class="q-desc">CRF 0</span>
+      </div>
+      <div class="quality-card active" data-quality="high">
+        <div class="q-icon">⭐</div>
+        <span class="q-label">High</span>
+        <span class="q-desc">CRF 18</span>
+      </div>
+      <div class="quality-card" data-quality="balanced">
+        <div class="q-icon">⚖️</div>
+        <span class="q-label">Balanced</span>
+        <span class="q-desc">CRF 23</span>
+      </div>
+      <div class="quality-card" data-quality="small">
+        <div class="q-icon">📦</div>
+        <span class="q-label">Small</span>
+        <span class="q-desc">CRF 28</span>
+      </div>
+      <div class="quality-card" data-quality="tiny">
+        <div class="q-icon">🗜️</div>
+        <span class="q-label">Tiny</span>
+        <span class="q-desc">CRF 35</span>
+      </div>
+    </div>
+
+    <!-- Resolution -->
+    <div class="option-row">
+      <div class="option-label">Resolution<span>output size</span></div>
+      <div class="btn-group" id="resGroup">
+        <button class="opt-btn active" data-res="original">Original</button>
+        <button class="opt-btn" data-res="1080p">1080p</button>
+        <button class="opt-btn" data-res="720p">720p</button>
+        <button class="opt-btn" data-res="480p">480p</button>
+      </div>
+    </div>
+
+    <!-- FPS -->
+    <div class="option-row">
+      <div class="option-label">Frame Rate<span>fps</span></div>
+      <div class="btn-group" id="fpsGroup">
+        <button class="opt-btn active" data-fps="original">Original</button>
+        <button class="opt-btn" data-fps="60">60 fps</button>
+        <button class="opt-btn" data-fps="30">30 fps</button>
+        <button class="opt-btn" data-fps="24">24 fps</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="convert-btn" id="convertBtn">
+    <span>⚡</span><span>CONVERT TO MP4</span>
+  </button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-label">
+      <span class="progress-status" id="progressStatus">Uploading…</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-note" id="progressNote">Keep this tab open while converting</div>
+  </div>
+
+  <div class="download-area" id="downloadArea">
+    <span class="download-icon">✅</span>
+    <div class="download-title">Conversion Complete!</div>
+    <div class="download-meta" id="downloadMeta">—</div>
+    <a class="download-btn" id="downloadLink">⬇ Download MP4</a>
+    <button class="convert-another" id="convertAnotherBtn">Convert another file</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="info-row">
+    <div class="info-card"><div class="icon">🪟</div><div class="label">Windows Ready</div><div class="desc">H.264 + AAC. Opens in WMP, VLC, Photos.</div></div>
+    <div class="info-card"><div class="icon">🎛️</div><div class="label">Full Control</div><div class="desc">Quality, resolution, and FPS options.</div></div>
+    <div class="info-card"><div class="icon">🗑️</div><div class="label">Auto Deleted</div><div class="desc">Files removed from server after 3 min.</div></div>
+  </div>
+
+  <footer>POWERED BY PYTHON · FLASK · FFMPEG &nbsp;·&nbsp; FILES AUTO-DELETED AFTER 3 MINUTES</footer>
+</div>
+
+<script>
+  // ⚠️ Replace with your Render.com URL after deploying
+  const BACKEND = 'https://YOUR-APP.onrender.com';
+
+  const $ = id => document.getElementById(id);
+  const dropZone     = $('dropZone'),   fileInput  = $('fileInput');
+  const fileCard     = $('fileCard'),   fileName   = $('fileName');
+  const fileSize     = $('fileSize'),   removeBtn  = $('removeBtn');
+  const settingsCard = $('settingsCard'), convertBtn = $('convertBtn');
+  const progressArea = $('progressArea'), progressStatus = $('progressStatus');
+  const progressPct  = $('progressPct'),  progressFill   = $('progressFill');
+  const progressNote = $('progressNote');
+  const downloadArea = $('downloadArea'), downloadMeta = $('downloadMeta');
+  const downloadLink = $('downloadLink'), convertAnotherBtn = $('convertAnotherBtn');
+  const errorMsg     = $('errorMsg');
+
+  let selectedFile = null;
+  let outputURL    = null;
+  let selectedQuality    = 'high';
+  let selectedResolution = 'original';
+  let selectedFps        = 'original';
+
+  // ── Quality cards ──
+  document.querySelectorAll('.quality-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.quality-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedQuality = card.dataset.quality;
+    });
+  });
+
+  // ── Resolution buttons ──
+  document.querySelectorAll('#resGroup .opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#resGroup .opt-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedResolution = btn.dataset.res;
+    });
+  });
+
+  // ── FPS buttons ──
+  document.querySelectorAll('#fpsGroup .opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#fpsGroup .opt-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedFps = btn.dataset.fps;
+    });
+  });
+
+  // ── File drop / select ──
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragging');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(f) {
+    const isMov = f.name.toLowerCase().endsWith('.mov') || f.type === 'video/quicktime';
+    if (!isMov) { showError('Please select a .mov file.'); return; }
+    hideError();
+    selectedFile = f;
+    fileName.textContent = f.name;
+    fileSize.textContent = formatSize(f.size);
+    fileCard.classList.add('visible');
+    settingsCard.classList.add('visible');
+    convertBtn.classList.add('visible');
+    downloadArea.classList.remove('visible');
+    progressArea.classList.remove('visible');
+  }
+
+  removeBtn.addEventListener('click', reset);
+  convertAnotherBtn.addEventListener('click', reset);
+
+  function reset() {
+    selectedFile = null; fileInput.value = '';
+    ['fileCard','settingsCard','progressArea','downloadArea'].forEach(id => $(id).classList.remove('visible'));
+    convertBtn.classList.remove('visible');
+    errorMsg.classList.remove('visible');
+    if (outputURL) { URL.revokeObjectURL(outputURL); outputURL = null; }
+  }
+
+  // ── Convert ──
+  convertBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    hideError();
+    convertBtn.disabled = true;
+    progressArea.classList.add('visible');
+    setProgress(0, 'Uploading…');
+    progressNote.textContent = 'Keep this tab open';
+    downloadArea.classList.remove('visible');
+
+    const formData = new FormData();
+    formData.append('file',       selectedFile);
+    formData.append('quality',    selectedQuality);
+    formData.append('resolution', selectedResolution);
+    formData.append('fps',        selectedFps);
+
+    // Animated fake progress during upload + conversion
+    let fakeP = 0;
+    const ticker = setInterval(() => {
+      fakeP = Math.min(fakeP + Math.random() * 3, 88);
+      setProgress(Math.round(fakeP),
+        fakeP < 25 ? 'Uploading…' :
+        fakeP < 50 ? 'Processing…' :
+        fakeP < 80 ? 'Converting…' : 'Almost done…'
+      );
+    }, 600);
+
+    try {
+      const response = await fetch(`${BACKEND}/convert`, {
+        method: 'POST', body: formData
+      });
+
+      clearInterval(ticker);
+
+      if (!response.ok) {
+        let errMsg = 'Server error';
+        try { const j = await response.json(); errMsg = j.error || errMsg; } catch(_) {}
+        throw new Error(errMsg);
+      }
+
+      setProgress(95, 'Downloading…');
+
+      const blob    = await response.blob();
+      if (outputURL) URL.revokeObjectURL(outputURL);
+      outputURL = URL.createObjectURL(blob);
+
+      const outName = selectedFile.name.replace(/\.mov$/i, '.mp4');
+      downloadLink.href     = outputURL;
+      downloadLink.download = outName;
+      downloadMeta.textContent = `${outName} · ${formatSize(blob.size)} · ${selectedQuality} quality`;
+
+      setProgress(100, 'Done!');
+      progressNote.textContent = '';
+      await new Promise(r => setTimeout(r, 300));
+
+      downloadArea.classList.add('visible');
+      progressArea.classList.remove('visible');
+
+      if (window.innerWidth <= 480) {
+        downloadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+    } catch(e) {
+      clearInterval(ticker);
+      showError('Error: ' + e.message);
+      progressArea.classList.remove('visible');
+    }
+
+    convertBtn.disabled = false;
+  });
+
+  function setProgress(pct, status) {
+    progressFill.style.width   = pct + '%';
+    progressPct.textContent    = pct + '%';
+    progressStatus.textContent = status;
+  }
+  function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('visible'); }
+  function hideError()    { errorMsg.classList.remove('visible'); }
+  function formatSize(b) {
+    if (b < 1024)    return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+</script>
+</body>
+</html>
